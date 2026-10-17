@@ -113,6 +113,25 @@ sync-template.ps1          同上（Windows PowerShell 5.1+ / 7+）
 - 想换字体：改顶部两个常量后重打 tag 分发，别在单篇文档里改。
 - 备选中文（追加到 `text-fonts` 末尾即可）：`"Noto Sans SC"`、`"Sarasa Gothic SC"`。
 
+## 各仓参数（占位符）
+
+`lib.typ` 里凡是想按仓库取值的地方，写成 `@@键名@@`；脚本按 `.template.conf` 的
+`键名=值` 逐条替换。现有两个键：
+
+| 键 | 默认值 | 作用 |
+| --- | --- | --- |
+| `EQNUM` | `none` | `equation-numbering`：公式编号格式 |
+| `TEXTSIZE` | `12pt` | `text-size`：正文字号 |
+
+conf 里没写的键用默认值兜底；脚本只替换「conf 里出现的键 + 默认键」，若 `lib.typ` 里
+还有别的 `@@X@@` 没给取值，会打印警告并原样留下（不会被静默吞掉）。
+
+**要新增一个可变项**：在 `lib.typ` 写 `@@新键名@@`，在两个脚本的 `DEFAULTS`
+（PowerShell 里是 `$defaults`）各加一行默认值即可，无需改替换逻辑。
+
+实际用途举例：`junior-high-math` 是给初中生的大字版，conf 里写 `TEXTSIZE=16pt`
+就让 27 篇文档保持原字号接入统一模板，**一篇文档都不用改**。
+
 ## 各仓如何接入
 
 在讲义仓库根目录放两个文件：
@@ -120,8 +139,9 @@ sync-template.ps1          同上（Windows PowerShell 5.1+ / 7+）
 `.template.conf`
 
 ```
-TAG=v1.0.0
+TAG=v1.0.2
 EQNUM='"(1)"'      # Typst 字面量：公式编号格式；none 表示不编号
+TEXTSIZE=16pt      # 可选，正文字号；不写则用默认 12pt
 ```
 
 `sync-template.sh` / `sync-template.ps1`（从本仓复制，内容完全相同）
@@ -147,19 +167,19 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 ```
 // ============================================================
 // template.typ — 自动生成，请勿手工修改
-// 源：typst-notes@v1.0.0（lib.typ）
+// 源：typst-notes@v1.0.2（lib.typ）
 // 重新生成：./sync-template.sh（Windows 用 ./sync-template.ps1）
-// 本仓公式编号默认值："(1)"
+// 本仓参数：EQNUM="(1)" TEXTSIZE=12pt
 // ============================================================
 
-<lib.typ 全文，其中 @@EQNUM@@ 被替换成本仓取值>
+<lib.typ 全文，其中 @@EQNUM@@ / @@TEXTSIZE@@ 被替换成本仓取值>
 ```
 
-各仓之间的差异因此只有 4 行内容（说明头 2 行 + 公式编号默认值 2 行），`diff` 出来共 8 行。
+各仓之间的差异因此只有 4 行内容（说明头 2 行 + 参数行 1 行 + 正文里的字号/编号行），`diff` 出来约 6–8 行。
 
 ## 改模板的流程
 
-1. 在本仓改 `lib.typ`，提交并打新 tag（如 `v1.0.1`）。
+1. 在本仓改 `lib.typ`，提交并打新 tag（如 `v1.0.3`）。
 2. 各讲义仓库把 `.template.conf` 的 `TAG` 改掉，跑 `./sync-template.sh`，提交。
 3. CI 跑 `./sync-template.sh --check`，防止有人手改 `template.typ` 造成漂移。
 
@@ -173,28 +193,27 @@ name: template
 on: [push, pull_request, workflow_dispatch]
 jobs:
   check:
-    uses: qiuzhanghua/typst-notes/.github/workflows/template-check.yml@v1.0.0
+    uses: qiuzhanghua/typst-notes/.github/workflows/template-check.yml@v1.0.2
 ```
 
 它做的事只有一件：在讲义仓库里跑 `./sync-template.sh --check`，退出码非 0 即失败
-（信息是「已过期，请运行 ./sync-template.sh」）。tag 固定成 `@v1.0.0` 是刻意的——
+（信息是「已过期，请运行 ./sync-template.sh」）。tag 固定成 `@v1.0.2` 是刻意的——
 校验脚本自身也会随模板一起升级，要换脚本时连调用方的 `@` 版本号一起改。
 
 ## 采用本模板的仓库
 
-| 仓库 | 公式编号 | 说明 |
-| --- | --- | --- |
-| high-school-math | `"(1)"` | 93 篇 |
-| high-school-physics | `none` | 2 篇 |
-| junior-school-physics | `"(1)"` | 1 篇 |
+| 仓库 | 公式编号 | 正文字号 | 篇数 |
+| --- | --- | --- | --- |
+| high-school-math | `"(1)"` | 12pt | 93 篇 |
+| high-school-physics | `none` | 12pt | 2 篇 |
+| junior-school-physics | `"(1)"` | 12pt | 1 篇 |
+| junior-high-math | `"(1)"` | **16pt** | 27 篇 |
 
-**未纳入**：
+**未纳入**：`buddha`（9 篇）—— 佛经排版，用的是 `cover-page` / `sutra-template`
+这套完全不同的 API，不属于同一模板体系。
 
-- `junior-high-math`（27 篇）：那一版模板的 `definition` 用的是自绘 `block` 而非
-  `figure` + 自动编号，正文默认 16pt，与现模板不是同一代；直接换会改变全部 27 篇的
-  版式（字号、环境编号），需要逐篇目视确认，故暂时保留原样。
-- `buddha`（9 篇）：佛经排版，用的是 `cover-page` / `sutra-template` 这套完全不同的 API，
-  不属于同一模板体系。
+`junior-high-math` 迁移时的实测：27 篇全部编译通过、文档零改动，页数 181→184
+（3 篇各 +1 页，原因是从自绘 `block` 换成 `figure` 后环境多了编号行）。
 
 ## 环境
 
