@@ -10,7 +10,6 @@ Typst 数理讲义模板的**单一源**。分发到各讲义仓库后，每个�
 lib.typ                    模板源码（唯一需要手工编辑的文件）
 sync-template.sh           生成 / 校验脚本（bash，Linux / macOS / Git Bash）
 sync-template.ps1          同上（Windows PowerShell 5.1+ / 7+）
-.github/workflows/         可复用 CI：校验各仓 template.typ 没有漂移
 ```
 
 ## 为什么不用 `@local` 包
@@ -185,20 +184,14 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 
 ## CI
 
-本仓提供可复用工作流 `.github/workflows/template-check.yml`。讲义仓库只需加一个 4 行文件
-`.github/workflows/template.yml`：
+每个讲义仓放一份 `.github/workflows/template.yml`（四仓内容完全相同，约 30 行），推上 GitHub 后自动生效：
 
-```yaml
-name: template
-on: [push, pull_request, workflow_dispatch]
-jobs:
-  check:
-    uses: qiuzhanghua/typst-notes/.github/workflows/template-check.yml@v1.0.2
-```
+1. 先探测 `raw.githubusercontent.com/<repo>/<TAG>/lib.typ` 是否取得到；
+2. **取不到就只发一条 notice 并跳过**——所以源仓还没建、或还不是公开仓库时，不会把讲义仓的 CI 弄红；
+3. 取得到才跑 `./sync-template.sh --check`，不一致即失败，并输出 `::error::` 注解。
 
-它做的事只有一件：在讲义仓库里跑 `./sync-template.sh --check`，退出码非 0 即失败
-（信息是「已过期，请运行 ./sync-template.sh」）。tag 固定成 `@v1.0.2` 是刻意的——
-校验脚本自身也会随模板一起升级，要换脚本时连调用方的 `@` 版本号一起改。
+早期方案是用本仓的 `workflow_call` 复用工作流（`uses: qiuzhanghua/typst-notes/...@v1.0.2`），
+但被调用的工作流不存在时 caller 会在**解析阶段**直接失败变红，正好是要避免的情况，故改为每仓自包含。
 
 ## 采用本模板的仓库
 
