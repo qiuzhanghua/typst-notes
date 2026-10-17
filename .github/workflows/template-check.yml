@@ -1,0 +1,42 @@
+# 可复用工作流：校验调用方仓库的 template.typ 与源仓（本仓，tag 见调用方 @ref）一致。
+#
+# 调用方只需在自己的仓库放 .github/workflows/template.yml：
+#
+#   name: template
+#   on: [push, pull_request, workflow_dispatch]
+#   jobs:
+#     check:
+#       uses: qiuzhanghua/typst-notes/.github/workflows/template-check.yml@v1.0.0
+#
+# 原理：actions/checkout 在 workflow_call 里检出的是【调用方】仓库，
+# 因此下面的 ./sync-template.sh 跑在讲义仓库里，脚本自己按 .template.conf 的 TAG
+# 去 raw.githubusercontent.com 取 lib.typ 做对比。
+name: template-check
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: template.typ 未漂移
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出调用方仓库
+        uses: actions/checkout@v4
+
+      - name: 校验（不一致则退出码 1）
+        shell: bash
+        run: |
+          set -o pipefail
+          if [ ! -f .template.conf ]; then
+            echo "::error::缺少 .template.conf（TAG / EQNUM），本仓尚未接入 typst-notes"
+            exit 1
+          fi
+          if [ ! -x ./sync-template.sh ]; then
+            echo "::notice::未找到 sync-template.sh，跳过校验"
+            exit 0
+          fi
+          ./sync-template.sh --check
