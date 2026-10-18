@@ -197,7 +197,7 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 
 | 仓库 | 公式编号 | 正文字号 | 篇数 |
 | --- | --- | --- | --- |
-| high-school-math | `"(1)"` | 12pt | 93 篇 |
+| high-school-math | `"(1)"` | 12pt | 94 篇 |
 | high-school-physics | `none` | 12pt | 2 篇 |
 | junior-school-physics | `"(1)"` | 12pt | 1 篇 |
 | junior-high-math | `"(1)"` | **16pt** | 27 篇 |
