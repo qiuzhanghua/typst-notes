@@ -10,6 +10,7 @@ Typst 数理讲义模板的**单一源**。分发到各讲义仓库后，每个�
 lib.typ                    模板源码（唯一需要手工编辑的文件）
 sync-template.sh           生成 / 校验脚本（bash，Linux / macOS / Git Bash）
 sync-template.ps1          同上（Windows PowerShell 5.1+ / 7+）
+template.yml               各讲义仓的 CI 工作流（复制到 .github/workflows/ 使用）
 ```
 
 ## 为什么不用 `@local` 包
@@ -129,11 +130,11 @@ conf 里没写的键用默认值兜底；脚本只替换「conf 里出现的键 
 （PowerShell 里是 `$defaults`）各加一行默认值即可，无需改替换逻辑。
 
 实际用途举例：`junior-high-math` 是给初中生的大字版，conf 里写 `TEXTSIZE=16pt`
-就让 27 篇文档保持原字号接入统一模板，**一篇文档都不用改**。
+就让 32 篇文档保持原字号接入统一模板，**一篇文档都不用改**。
 
 ## 各仓如何接入
 
-在讲义仓库根目录放两个文件：
+在讲义仓库根目录放三个文件：
 
 `.template.conf`
 
@@ -143,7 +144,8 @@ EQNUM='"(1)"'      # Typst 字面量：公式编号格式；none 表示不编号
 TEXTSIZE=16pt      # 可选，正文字号；不写则用默认 12pt
 ```
 
-`sync-template.sh` / `sync-template.ps1`（从本仓复制，内容完全相同）
+`sync-template.sh` / `sync-template.ps1`（从本仓复制，内容完全相同），
+以及 `.github/workflows/template.yml`（本仓 `template.yml` 的副本）。
 
 然后：
 
@@ -174,7 +176,8 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 <lib.typ 全文，其中 @@EQNUM@@ / @@TEXTSIZE@@ 被替换成本仓取值>
 ```
 
-各仓之间的差异因此只有 4 行内容（说明头 2 行 + 参数行 1 行 + 正文里的字号/编号行），`diff` 出来约 6–8 行。
+各仓之间的差异因此只有 3 处、6 行（`diff` 计法：说明头里的参数行 1 处、说明行 1 处、
+正文里的 `equation-numbering` / `text-size` 取值），其余 290 行完全相同。
 
 ## 改模板的流程
 
@@ -184,29 +187,59 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 
 ## CI
 
-每个讲义仓放一份 `.github/workflows/template.yml`（四仓内容完全相同，约 30 行），推上 GitHub 后自动生效：
+每个讲义仓放一份 `.github/workflows/template.yml`（四仓内容完全相同，与本仓根目录的
+`template.yml` 逐字节一致），推上 GitHub 后自动生效。分四步，**「没校验」和「不一致」
+是两种不同的信号**，前者只告警、后者才失败：
 
-1. 先探测 `raw.githubusercontent.com/<repo>/<TAG>/lib.typ` 是否取得到；
-2. **取不到就只发一条 notice 并跳过**——所以源仓还没建、或还不是公开仓库时，不会把讲义仓的 CI 弄红；
-3. 取得到才跑 `./sync-template.sh --check`，不一致即失败，并输出 `::error::` 注解。
+1. **读取 `.template.conf`**：取 `TAG`，做一次白名单校验（`[A-Za-z0-9._-]`）。缺文件/缺 `TAG`
+   /含非法字符 → `::error::` 失败（这是配置错了，不该和「源仓连不上」混在一起）。
+2. **探测源仓**：`curl` 取 `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。
+   - 取得到 → `mode=ok`，Summary 里记一笔；
+   - 取不到 → `mode=unreachable`，发一条 `::warning::`（标题「模板校验被跳过」）并在
+     **Job Summary 里写明「没有校验」及原因**（私有仓 / TAG 没推 / runner 出网被拦），
+     然后继续。所以源仓还没建、或还是私有仓时，不会把讲义仓的 CI 弄红，但也**不会静默变绿**。
+3. **本地兜底检查**（与网络无关，永远跑）：`template.typ` 里不允许残留 `@@KEY@@` 占位符，
+   头部注释的 `typst-notes@<TAG>` 必须与 `.template.conf` 一致。这两条能抓住绝大多数手改/忘同步。
+4. **与源仓逐字节比对**：只在第 2 步 `mode=ok` 时执行 `./sync-template.sh --check`，
+   不一致即失败并输出 `::error::`。
 
 早期方案是用本仓的 `workflow_call` 复用工作流（`uses: qiuzhanghua/typst-notes/...@v1.0.2`），
 但被调用的工作流不存在时 caller 会在**解析阶段**直接失败变红，正好是要避免的情况，故改为每仓自包含。
 
+## 踩坑：变量后面紧跟全角字符
+
+`sync-template.sh` 里凡是变量后面直接跟全角标点的字符串，**必须**写成 `${TAG}` 而不是 `$TAG`：
+
+```bash
+# 错：macOS 自带的 bash 3.2 会把「（」的首字节吃进变量名
+echo "源：typst-notes@$TAG（lib.typ）"     # → TAG?: unbound variable
+# 对
+echo "源：typst-notes@${TAG}（lib.typ）"
+```
+
+原因：bash 3.2 判断变量名边界时按字节走，全角括号的 UTF-8 首字节 `0xEF` 落在
+「可作标识符」的区间里，于是变量名被解析成 `TAG\xef`；在 `set -u` 下就是
+`TAG?: unbound variable`，整个脚本直接退出。bash 5 / dash / zsh 不受影响，
+所以在 Linux CI 上一直是绿的，只有 macOS 本机会挂。`template.yml` 里也有同样写法的地方
+（拼 `want="typst-notes@${tag}（lib.typ）"`），改的时候两边一起改。
+
 ## 采用本模板的仓库
 
-| 仓库 | 公式编号 | 正文字号 | 篇数 |
-| --- | --- | --- | --- |
-| high-school-math | `"(1)"` | 12pt | 94 篇 |
-| high-school-physics | `none` | 12pt | 2 篇 |
-| junior-school-physics | `"(1)"` | 12pt | 1 篇 |
-| junior-high-math | `"(1)"` | **16pt** | 27 篇 |
+| 仓库 | 公式编号 | 正文字号 | 篇数 | 页数 |
+| --- | --- | --- | --- | --- |
+| high-school-math | `"(1)"` | 12pt | 94 篇 | 637 |
+| high-school-physics | `none` | 12pt | 2 篇 | 13 |
+| junior-school-physics | `"(1)"` | 12pt | 1 篇 | 6 |
+| junior-high-math | `"(1)"` | **16pt** | 32 篇 | 131 |
+
+（篇数/页数为 2026-10-22 全量编译实测：Typst 0.15.1，逐篇 `typst compile`，`template.typ` 不计。）
 
 **未纳入**：`buddha`（9 篇）—— 佛经排版，用的是 `cover-page` / `sutra-template`
 这套完全不同的 API，不属于同一模板体系。
 
-`junior-high-math` 迁移时的实测：27 篇全部编译通过、文档零改动，页数 181→184
-（3 篇各 +1 页，原因是从自绘 `block` 换成 `figure` 后环境多了编号行）。
+`junior-high-math` 迁移时的实测：当时 27 篇全部编译通过、文档零改动；唯一的版面变化是
+有几篇各 +1 页，原因是从自绘 `block` 换成 `figure` 后环境多了一行编号。迁移后该仓又新增
+5 篇整式乘法文档，现为 32 篇。
 
 ## 环境
 
