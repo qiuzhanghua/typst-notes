@@ -230,9 +230,9 @@ echo "源：typst-notes@${TAG}（lib.typ）"
 | high-school-math | `"(1)"` | 12pt | 94 篇 | 637 |
 | high-school-physics | `none` | 12pt | 2 篇 | 13 |
 | junior-school-physics | `"(1)"` | 12pt | 1 篇 | 6 |
-| junior-high-math | `"(1)"` | **16pt** | 32 篇 | 131 |
+| junior-high-math | `"(1)"` | **16pt** | 35 篇 | 149 |
 
-（篇数/页数为 2026-10-22 全量编译实测：Typst 0.15.1，逐篇 `typst compile`，`template.typ` 不计。）
+（篇数/页数为 2026-11-13 全量编译实测：Typst 0.15.1，逐篇 `typst compile`，`template.typ` 不计。）
 
 **未纳入**：`buddha`（9 篇）—— 佛经排版，用的是 `cover-page` / `sutra-template`
 这套完全不同的 API，不属于同一模板体系。
