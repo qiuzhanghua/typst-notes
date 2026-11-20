@@ -227,7 +227,7 @@ echo "源：typst-notes@${TAG}（lib.typ）"
 
 | 仓库 | 公式编号 | 正文字号 | 篇数 | 页数 |
 | --- | --- | --- | --- | --- |
-| high-school-math | `"(1)"` | 12pt | 94 篇 | 637 |
+| high-school-math | `"(1)"` | 12pt | 95 篇 | 653 |
 | high-school-physics | `none` | 12pt | 2 篇 | 13 |
 | junior-school-physics | `"(1)"` | 12pt | 1 篇 | 6 |
 | junior-high-math | `"(1)"` | **16pt** | 35 篇 | 149 |
