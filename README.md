@@ -86,7 +86,7 @@ template.yml               各讲义仓的 CI 工作流（复制到 .github/work
 | `important-block` | `#important-block[...]` | 细灰边框提示框（无编号） |
 | `problem-box` / `idea-box` | `#problem-box[...]` / `#idea-box[...]` | 绿/黄左侧色条框：题目 / 破题思路 |
 | `blank` | `#blank()` / `#blank(2)` / `#blank(5em)` | 填空横线；无参默认 3em，数字按 em 倍数解释 |
-| `cjk` | `$x_(#cjk[极值点])$` | 数学模式内指定中文字体（见下方「字体」） |
+| `cjk` | `$x_(#cjk[极值点])$` | 数学模式内**强制**指定中文字体（一般不必再用，见下方「字体」） |
 | `qed` | `#qed` | 右对齐的 □ 结束符 |
 
 四类编号环境（定义 / 定理 / 示例 / 注）**各自独立计数、整篇连续**。
@@ -107,9 +107,23 @@ template.yml               各讲义仓的 CI 工作流（复制到 .github/work
   Typst 按列表顺序逐字查找，缺字才落到下一项，所以**列表必须是「数学字体在前、中文字体在后」**。
 - 文档里**不要**再写 `#set text(font: ...)`。单字体覆盖会替换掉整个列表，中文立刻失去 CJK 回退
   （表现是中文变黑体、与正文宋体不一致）。
+- **数学模式**：`$...$` 里直接写中文（如 `$x = 1 quad 即 quad y$`）默认不继承 `text-fonts`，
+  Typst 只按数学字体找字，缺字就落到系统第一个 CJK 字体——本机是 `AR PL UKai`（楷体），
+  宋体正文里夹一句楷体非常扎眼。模板因此加了一条兜底规则：
+
+  ```typst
+  show math.equation: set text(font: text-fonts)
+  ```
+
+  数学字体仍在列表首位，公式字形不受影响，只有中文回退到宋体。`#cjk[...]` 依然保留，
+  用于确实要在公式里换一种字体（例如需要强制 `cjk-font` 单一字体）的场合。
 - 文件名/家族名陷阱：机器上装的是 `Noto Serif CJK`（同族含 `NotoSerifCJKsc-*.otf`），
   但 Typst 把 `Source Han Serif` 作为**同族别名**解析，PDF 内嵌字体会显示为
   `SourceHanSerifVF-*`。这是正常现象，不是缺字体。
+- **家族名别写错**：Typst 只认 `Source Han Serif` / `Source Han Serif SC` / `… JP` / `… KR` 等
+  家族名；写成 `Source Han Serif CN`（思源宋体 CN 的**子族**名）Typst 找不到，
+  会**静默**回退到 `AR PL UKai` 楷体，且不报任何错误。查证方法：`typst fonts | grep -i "han serif"`
+  列出 Typst 实际看到的家族名；或用 `pdffonts out.pdf` 看最终内嵌字体。
 - 想换字体：改顶部两个常量后重打 tag 分发，别在单篇文档里改。
 - 备选中文（追加到 `text-fonts` 末尾即可）：`"Noto Sans SC"`、`"Sarasa Gothic SC"`。
 
@@ -139,7 +153,7 @@ conf 里没写的键用默认值兜底；脚本只替换「conf 里出现的键 
 `.template.conf`
 
 ```
-TAG=v1.0.2
+TAG=v1.0.3
 EQNUM='"(1)"'      # Typst 字面量：公式编号格式；none 表示不编号
 TEXTSIZE=16pt      # 可选，正文字号；不写则用默认 12pt
 ```
@@ -168,7 +182,7 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 ```
 // ============================================================
 // template.typ — 自动生成，请勿手工修改
-// 源：typst-notes@v1.0.2（lib.typ）
+// 源：typst-notes@v1.0.3（lib.typ）
 // 重新生成：./sync-template.sh（Windows 用 ./sync-template.ps1）
 // 本仓参数：EQNUM="(1)" TEXTSIZE=12pt
 // ============================================================
@@ -203,7 +217,7 @@ GitHub `raw.githubusercontent.com/<repo>/<TAG>/lib.typ`。两个脚本生成的�
 4. **与源仓逐字节比对**：只在第 2 步 `mode=ok` 时执行 `./sync-template.sh --check`，
    不一致即失败并输出 `::error::`。
 
-早期方案是用本仓的 `workflow_call` 复用工作流（`uses: qiuzhanghua/typst-notes/...@v1.0.2`），
+早期方案是用本仓的 `workflow_call` 复用工作流（`uses: qiuzhanghua/typst-notes/...@<TAG>`），
 但被调用的工作流不存在时 caller 会在**解析阶段**直接失败变红，正好是要避免的情况，故改为每仓自包含。
 
 ## 踩坑：变量后面紧跟全角字符
